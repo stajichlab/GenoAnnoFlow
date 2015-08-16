@@ -1,22 +1,21 @@
 import unittest
+from math import ceil
+
+CHUNK_LIMIT = 1000
+
+class FormatError(Exception):
+    pass
+
 
 class TestFastaParse(unittest.TestCase):
     def setUp(self):
         import StringIO
         self.singleInputFile = StringIO.StringIO(
-           """>myFasta1 description1
-           ACTG
-           GTCA
-           """)
+           ">myFasta1 description1\nACTG\nGTCA\n")
 
         self.multipleInputFile = StringIO.StringIO(
-            """>myFasta1 description1
-            ACTG
-            GTCA
-            >myFasta2 description2
-            GATACA
-            ACATAG
-            """)
+            ">myFasta1 description1\nACTG\nGTCA\n>myFasta2 description2\n"
+            "GATACA\nACATAG\n")
 
     def test_SingleRecord(self):
         self.assertEqual(
@@ -36,25 +35,35 @@ class TestFastaParse(unittest.TestCase):
 
 class TestPartition(unittest.TestCase):
     def test_SmallEvenDivision(self):
-        self.fail()
+        self.assertEqual(partition([1,2,3,4,5,6], 2), [[1,2,3],[4,5,6]])
 
     def test_SmallOddDivision(self):
-        self.fail()
+        self.assertEqual(partition([1,2,3,4,5,6,7], 3), [[1,2],[3,4,5],[6,7]])
 
     def test_LargeEvenDivision(self):
-        self.fail()
+        self.assertEqual(partition(range(1,21), 4), 
+                         [range(1,6), range(6,11), range(11,16), range(16,21)])
 
     def test_LargeOddDivision(self):
-        self.fail()
+        self.assertEqual(partition(range(1,23), 5),
+                         [range(1,5), range(5,10), range(10,14), range(14,19),
+                          range(19,23)])
+
+    def test_ZeroDivision(self):
+        with self.assertRaises(ZeroDivisionError):
+            partition([1,2,3,4,5], 0)
 
     def test_NegativeDivision(self):
-        self.fail()
+        with self.assertRaises(ValueError):
+            partition([1,2,3,4,5], -1)
 
     def test_TooBigDivisor(self):
-        self.fail()
+        with self.assertRaises(ValueError):
+            partition([1,2,3,4,5], 10)
 
     def test_NonIntegerDivisor(self):
-        self.fail()
+        with self.assertRaises(TypeError):
+            partition([1,2,3,4,5], 0.7)
 
 class TestSplitRecords(unittest.TestCase):
     def setUp(self):
@@ -66,33 +75,39 @@ class TestSplitRecords(unittest.TestCase):
 
 class TestFilenameGenerator(unittest.TestCase):
     def setUp(self):
-        pass
+        self.normalGen = filenameGenerator('myFile', 'fa', 5)
+        self.negativeGen = filenameGenerator('myFile', 'fa', -4)
+        self.zeroGen = filenameGenerator('myFile', 'fa', 0)
+        self.nonStringFilenameGen = filenameGenerator(1, 'fa', 5)
+        self.nonStringExtensionGen = filenameGenerator('myFile', 1, 5)
 
     def test_NormalIterables(self):
-        self.fail()
+        self.assertEqual(list(self.normalGen), ['myFile_0.fa',
+                                                'myFile_1.fa',
+                                                'myFile_2.fa',
+                                                'myFile_3.fa',
+                                                'myFile_4.fa'])
 
     def test_NegativeIterables(self):
-        self.fail()
+        self.assertEqual(list(self.negativeGen), [])
 
     def test_ZeroIterables(self):
-        self.fail()
+        self.assertEqual(list(self.zeroGen), [])
 
     def test_NonStringBasename(self):
-        self.fail()
+        with self.assertRaises(TypeError):
+            list(self.nonStringFilenameGen)
 
     def test_NonStringExtension(self):
-        self.fail()
+        with self.assertRaises(TypeError):
+            list(self.nonStringExtensionGen)
 
     def tearDown(self):
         pass
 
 
 class TestWriteFiles(unittest.TestCase):
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
+    pass
 
 
 def parseFASTA(fileHandle):
@@ -110,9 +125,18 @@ def parseFASTA(fileHandle):
         a list of FASTA records (including newlines)
 
     """
-    #for line in fileHandle:
+    records = []
 
-    return []
+    for line in fileHandle:
+        if line.startswith('>'):
+            records.append(line)
+        else:
+            try:
+                records[-1] += line
+            except IndexError:
+                raise FormatError("Check your FASTA file for format errors")
+
+    return records
 
 def partition(lst, n):
     """Splits a list into n chunks of equal or nearly equal length.
@@ -143,12 +167,19 @@ def partition(lst, n):
     ------
     [Joao Silva](http://stackoverflow.com/questions/2659900/)
     """
+    if n < 0:
+        raise ValueError("Can't divide list into negative chunks")
+    if n > len(lst):
+        raise ValueError("Can't divide list into more chunks than items in list")
+    if not type(n) == int:
+        raise TypeError("Can't divide list by non-integer value")
+
     division = len(lst) / float(n)
     return [ lst[int(round(division * i)) : int(round(division * (i + 1)))] 
              for i in xrange(n)
             ]
 
-def splitRecords(records, customSizes=False, random=False):
+def splitRecords(records, chunks, customSizes=False, random=False):
     """Splits up the FASTA records into chunks to be written to
     different files.
 
@@ -156,6 +187,8 @@ def splitRecords(records, customSizes=False, random=False):
     ----------
     records : ['>fasta1\nACTG\n', '>fasta2\nACTG\nACTG\n', ...] list
         a list of FASTA records (including newlines)
+    chunks : int
+        number of chunks/files to split the FASTA records into
     customSizes : [4, 6, 8, 10] list of ints
         a list of integers that will be used in order to build
         chunks of the given sizes instead of evenly sized
@@ -170,10 +203,12 @@ def splitRecords(records, customSizes=False, random=False):
 
     """
 
-    if customSizes:
+    if customSizes or random:
         raise NotImplementedError()
+    if chunks > CHUNK_LIMIT:
+        raise ValueError("Cannot split into more than %s files" % CHUNK_LIMIT)
 
-    return []
+    return partition(records, chunks)
 
 def filenameGenerator(base, ext, n):
     """Generator that returns n filenames.
@@ -194,6 +229,10 @@ def filenameGenerator(base, ext, n):
         iterable that returns generated filenames
 
     """
+    if not type(base) == str:
+        raise TypeError("Basename for file must be a string")
+    if not type(ext) == str:
+        raise TypeError("Extension must be a string")
 
     generated = 0
 
@@ -220,10 +259,23 @@ def writeFiles(chunks, filenameBase, fileExtension=''):
     Nothing
 
     """
+    if len(chunks) > CHUNK_LIMIT:
+        raise ValueError("Cannot split into more than %s files" % CHUNK_LIMIT)
+    outFiles = filenameGenerator(filenameBase, fileExtension, len(chunks))
+    for (index, outFile) in enumerate(outFiles):
+        try:
+            with open(outFile, 'w') as output:
+                for record in chunks[index]:
+                    output.write(record)
+        except IOError as e:
+            if e.errno == errno.EACCES:
+                sys.exit("Do not have permission to write %s" % outFile)
+            raise
 
 if __name__ == "__main__":
     import argparse
     import os
+    import sys
 
     parser = argparse.ArgumentParser(
                 description='Split one fasta file into multiple fasta files.',
@@ -249,17 +301,22 @@ if __name__ == "__main__":
                         type=list)
     opts = parser.parse_args()
 
-    if not os.path.isfile(inputFilename):
-        if not os.access(inputFilename, os.R_OK):
-            sys.exit('Do not have permissions to read the input file!')
-        else:
-            raise IOError('The specified input file was not found!')
+    if os.path.isfile(opts.inputFile):
+        try:
+            with open(opts.inputFile) as inputFASTAHandle:
+                recordsList = parseFASTA(inputFASTAHandle)
+        except IOError as e:
+            if e.errno == errno.EACCES:
+                sys.exit("Do not have permission to read the input file!")
     else:
-        with open(inputFilename) as inputFASTAHandle:
-            recordsList = parseFASTA(inputFASTAHandle)
+        raise IOError('The specified input file was not found!')
 
     outputRecords = splitRecords(recordsList,
+                                 opts.outputFileCount,
                                  customSizes=opts.sizes,
                                  random=opts.random)
 
-    writeFiles(outputRecords)
+    if not opts.basename:
+        opts.basename = opts.inputFile
+
+    writeFiles(outputRecords, opts.basename, 'fa')
