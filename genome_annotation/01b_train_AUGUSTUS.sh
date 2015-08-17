@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l nodes=1:ppn=1,mem=16gb,walltime=48:00:00 -j oe -n augTrain
+#PBS -l mem=16gb,walltime=48:00:00 -j oe -n augTrain
 
 SPECIES="Fairchild"
 
