@@ -10,3 +10,9 @@ Support for selecting best protein/EST/RNAseq sets
 See [this website](http://www.molecularevolution.org/molevolfiles/exercises/augustus/training.html) for information on gene training in AUGUSTUS.
 
 ###01c - GeneMark
+
+##02 - MAKER
+
+##03 - Map ID's
+
+##04 - Functional Annotation
