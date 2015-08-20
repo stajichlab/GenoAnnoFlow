@@ -14,5 +14,11 @@ awk -F "=" '{print $2}' > AED_scores.txt
 grep -oP '_eAED=(\S){4}' ${BASE}.all.gff | \
 awk -F "=" '{print $2}' > eAED_scores.txt
 
+#generate feature counts
+awk '{if (!($1 ~ "#")){print $3}}' Citrus_chr_polished_round2.all.gff | sort | uniq -c > feature_count.txt
+
 #make png images of cumulative frequency plots of AED/eAED scores
 Rscript generateAEDplots.r
+
+#make png image of bar plot for feature counts
+Rscript generateFeatureCounts.r
